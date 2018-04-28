@@ -1,32 +1,38 @@
 function init(){
     var scene = new THREE.Scene();
     var gui = new dat.GUI();
+    var clock = new THREE.Clock();
 
     var enableFog = false;
-    if(enableFog){
+
+    if (enableFog) {
         scene.fog = new THREE.FogExp2(0xffffff, 0.2);
     }
 
-    var box = getBox(1,1,1);
-    var plane = getPlane(20);
-    var pointLight = getPointLight(1);
+    var plane = getPlane(30);
+    var directionalLight = getDirectionalLight(1);
     var sphere = getSphere(0.05);
+    var boxGrid = getBoxGrid(10, 1.5);
 
     plane.name = 'plane-1';
-
-    box.position.y = box.geometry.parameters.height/2;
+    boxGrid.name = 'boxGrid';
+    
     plane.rotation.x = Math.PI/2;
-    pointLight.position.y = 2;
-    pointLight.intensity = 2;
-    
-    gui.add(pointLight, 'intensity', 0, 10);
-    gui.add(pointLight.position, 'y', 0, 5);
+    directionalLight.position.x = 13;
+    directionalLight.position.y = 10;
+    directionalLight.position.z = 10;
+    directionalLight.intensity = 2;
 
-    scene.add(box);
     scene.add(plane);
-    pointLight.add(sphere);
-    scene.add(pointLight);
+    directionalLight.add(sphere);
+    scene.add(directionalLight);
+    scene.add(boxGrid);
     
+    gui.add(directionalLight, 'intensity', 0, 10);
+    gui.add(directionalLight.position, 'x', 0, 20);
+    gui.add(directionalLight.position, 'y', 0, 20);
+    gui.add(directionalLight.position, 'z', 0, 20);
+
     var camera = new THREE.PerspectiveCamera(
         45,
         window.innerWidth/window.innerHeight,
@@ -34,21 +40,21 @@ function init(){
         1000
     );
 
-    camera.position.x = 1;
-    camera.position.y = 2;
-    camera.position.z = 5;
+    camera.position.x = 10;
+    camera.position.y = 18;
+    camera.position.z = -18;
 
     camera.lookAt(new THREE.Vector3(0,0,0));
 
     var renderer = new THREE.WebGLRenderer();
     renderer.shadowMap.enabled = true;
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor('rgba(120,120,120)');
+    renderer.setClearColor('rgb(120,120,120)');
     document.getElementById('webgl').appendChild(renderer.domElement);
 
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-    update(renderer, scene, camera, controls);
+    update(renderer, scene, camera, controls, clock);
 
     return scene;
 }
@@ -101,21 +107,71 @@ function getPointLight(intensity){
     light.castShadow = true;
     return light;
 }
+function getSpotLight(intensity){
+    var light = new THREE.SpotLight(0xffffff, intensity);
+    light.castShadow = true;
+    light.shadow.bias = 0.001;
+    light.shadow.mapSize.width = 2048;
+    light.shadow.mapSize.height = 2048;
+    return light;
+}
+function getDirectionalLight(intensity){
+    var light = new THREE.DirectionalLight(0xffffff, intensity);
+    light.castShadow = true;
+
+    light.shadow.camera.left = -10;
+    light.shadow.camera.bottom = -10;
+    light.shadow.camera.right = 10;
+    light.shadow.camera.top = 10;
+
+
+    return light;
+}
+function getAmbientLight(intensity){
+    var light = new THREE.AmbientLight('rgb(10,30,50)', intensity);
+    return light;
+}
 
 function getBoxGrid(amount, separationMultiplier){
     var group = new THREE.Group();
 
-    // for(var i=0; i<)
+    for(var i=0; i<amount; i++){
+        var obj = getBox(1,1,1);
+        obj.position.x = i * separationMultiplier;
+        obj.position.y = obj.geometry.parameters.height/2;
+        group.add(obj);
+        for (var j=1; j<amount; j++){
+            var obj = getBox(1,1,1);
+            obj.position.x = i * separationMultiplier ;
+            obj.position.y = obj.geometry.parameters.height/2;
+            obj.position.z = j * separationMultiplier;
+            group.add(obj);
+        }
+    }
+
+    group.position.x = -(separationMultiplier * (amount-1))/2;
+    group.position.z = -(separationMultiplier * (amount-1))/2;
+
+    return group;
 }
 
-function update(renderer, scene, camera, controls){
+function update(renderer, scene, camera, controls, clock){
     renderer.render(
     	scene,
     	camera
     );
 
+    var timeElapsed = clock.getElapsedTime();
+
+    var boxGrid = scene.getObjectByName('boxGrid');
+    boxGrid.children.forEach(function(child , index){
+        var x = timeElapsed * 5 + index;
+        child.scale.y = (noise.simplex2(x,x) + 1) / 2 + 0.001;
+        child.position.y = child.scale.y/2;
+    })
+
     requestAnimationFrame(function(){
-        update(renderer, scene, camera, controls);
+        update(renderer, scene, camera, controls, clock);
     });
     
 }
